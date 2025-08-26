@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sepolia Wallet UI</title>
+  <style>
+    body { font-family: Arial; margin: 2em; }
+    input, button { margin: 0.5em 0; }
+    #output { white-space: pre-wrap; background: #f4f4f4; padding: 1em; }
+  </style>
+</head>
+<body>
+  <h2>Create Wallet</h2>
+  <button onclick="createWallet()">Create Wallet</button>
+  <div id="wallet"></div>
+
+  <h2>Connect Wallet</h2>
+  <input id="connectPrivateKey" placeholder="Private Key">
+  <button onclick="connectWallet()">Connect</button>
+  <div id="connectResult"></div>
+
+  <h2>Network</h2>
+  <select id="network">
+    <option value="sepolia">Sepolia Testnet</option>
+    <option value="mainnet">Ethereum Mainnet</option>
+  </select>
+
+  <h2>ETH Price Comparison</h2>
+  <button onclick="getEthPrice()">Get ETH Prices</button>
+  <div id="ethPrice" style="font-size: 20px; margin: 10px 0; line-height: 1.5;"></div>
+
+  <h2>Check Balance</h2>
+  <input id="balanceAddress" placeholder="Wallet Address">
+  <button onclick="checkBalance()">Check Balance</button>
+  <div id="balance"></div>
+
+  <h2>Send Transaction</h2>
+  <input id="fromPrivateKey" placeholder="Sender Private Key">
+  <input id="toAddress" placeholder="Receiver Address">
+  <input id="amount" placeholder="Amount (ETH)">
+  <button onclick="sendTx()">Send</button>
+  <div id="tx"></div>
+
+  <h2>ETH Market Data</h2>
+  <button onclick="getEthMarket()">Get ETH Market Data</button>
+  <div id="ethMarket"></div>
+
+  <h2>Ethereum Market Analysis</h2>
+  <button onclick="getEthMarketAnalysis()">Analyze ETH Market</button>
+  <div id="ethMarketAnalysis"></div>
+
+  <h2>Gemini Analysis</h2>
+  <input id="geminiPrompt" placeholder="Prompt for Gemini">
+  <button onclick="geminiAnalyze()">Analyze</button>
+  <div id="geminiResult"></div>
+
+  <h2>Output</h2>
+  <div id="output"></div>
+
+  <script>
+    function getNetwork() {
+      return document.getElementById('network').value;
+    }
+    function createWallet() {
+      fetch('http://localhost:3000/create-wallet', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('wallet').textContent = `Address: ${data.address}\nPrivate Key: ${data.privateKey}`;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        });
+    }
+    function connectWallet() {
+      const privateKey = document.getElementById('connectPrivateKey').value;
+      fetch('http://localhost:3000/connect-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ privateKey })
+      })
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('connectResult').textContent = `Address: ${data.address}`;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        });
+    }
+    function checkBalance() {
+      const address = document.getElementById('balanceAddress').value;
+      const network = getNetwork();
+      fetch('http://localhost:3000/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, network })
+      })
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('balance').textContent = `Balance: ${data.balance} ETH`;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        });
+    }
+    function sendTx() {
+      const fromPrivateKey = document.getElementById('fromPrivateKey').value;
+      const to = document.getElementById('toAddress').value;
+      const value = document.getElementById('amount').value;
+      const network = getNetwork();
+      fetch('http://localhost:3000/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromPrivateKey, to, value, network })
+      })
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('tx').textContent = `Tx Hash: ${data.hash}`;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        });
+    }
+    function getEthPrice() {
+      fetch('http://localhost:3000/eth-price')
+        .then(r => r.json())
+        .then(data => {
+          const priceElem = document.getElementById('ethPrice');
+          let html = '';
+          
+          // Display all available prices
+          if (data.prices) {
+            // CoinMarketCap
+            if (data.prices.coinmarketcap) {
+              html += `<div><span style="color:#3861FB">$${data.prices.coinmarketcap.toLocaleString()}</span> <small>CoinMarketCap</small></div>`;
+            }
+            
+            // CoinGecko
+            if (data.prices.coingecko) {
+              html += `<div><span style="color:#8DC647">$${data.prices.coingecko.toLocaleString()}</span> <small>CoinGecko</small></div>`;
+            }
+            
+            // Last updated
+            html += `<div style="font-size:12px; color:#666; margin-top:10px;">Last updated: ${new Date(data.lastUpdated).toLocaleString()}</div>`;
+            
+            // Display errors if any
+            if (data.errors && data.errors.length > 0) {
+              html += `<div style="font-size:12px; color:#ff6666; margin-top:5px;">Some API calls failed (see details below)</div>`;
+            }
+          } else {
+            html = `<span style="color:red">No price data available</span>`;
+          }
+          
+          priceElem.innerHTML = html;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+          document.getElementById('ethPrice').innerHTML = `<span style="color:red">Error: ${error.message}</span>`;
+        });
+    }
+    
+    function getEthMarket() {
+      fetch('http://localhost:3000/eth-market')
+        .then(r => r.json())
+        .then(data => {
+          // Check if we have an error response
+          if (data.error) {
+            document.getElementById('ethMarket').innerHTML = `<span style="color:red">Error: ${data.error}</span>`;
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+            return;
+          }
+          
+          let html = `<b>Name:</b> ${data.name} (${data.symbol})<br>`;
+          html += `<b>Price:</b> $${data.price.toLocaleString()}<br>`;
+          html += `<b>Market Cap:</b> $${data.market_cap.toLocaleString()}<br>`;
+          html += `<b>24h Volume:</b> $${data.volume_24h.toLocaleString()}<br>`;
+          html += `<b>24h Change:</b> ${data.price_change_24h.toFixed(2)}%<br>`;
+          html += `<b>Last Updated:</b> ${new Date(data.last_updated).toLocaleString()}<br>`;
+          
+          // Show data source
+          if (data.source === 'coingecko') {
+            html += `<b>Source:</b> <span style="color:#8DC647">CoinGecko</span><br>`;
+          } else if (data.source === 'coinmarketcap') {
+            html += `<b>Source:</b> <span style="color:#3861FB">CoinMarketCap</span><br>`;
+          }
+          
+          document.getElementById('ethMarket').innerHTML = html;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+          document.getElementById('ethMarket').innerHTML = `<span style="color:red">Error: ${error.message}</span>`;
+        });
+    }
+    
+    function getEthMarketAnalysis() {
+      document.getElementById('ethMarketAnalysis').innerHTML = `<span style="color:blue">Loading real-time analysis...</span>`;
+      
+      fetch('http://localhost:3000/eth-market-analyze')
+        .then(r => r.json())
+        .then(data => {
+          // Check if we have an error response
+          if (data.error) {
+            document.getElementById('ethMarketAnalysis').innerHTML = `<span style="color:red">Error: ${data.error}</span>`;
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+            return;
+          }
+          
+          // Create a more detailed market data display
+          let html = `<div style="border:1px solid #e0e0e0; padding:15px; border-radius:5px; margin-bottom:20px;">`;
+          html += `<h3 style="margin-top:0;">Real-Time Market Data</h3>`;
+          html += `<b>Price:</b> $${data.market.price.toLocaleString()}<br>`;
+          html += `<b>24h Change:</b> <span style="${data.market.price_change_24h >= 0 ? 'color:green' : 'color:red'}">${data.market.price_change_24h.toFixed(2)}%</span><br>`;
+          html += `<b>Market Cap:</b> $${data.market.market_cap.toLocaleString()}<br>`;
+          html += `<b>24h Volume:</b> $${data.market.volume_24h.toLocaleString()}<br>`;
+          html += `<b>Data Source:</b> ${data.market.source === 'coingecko' ? 
+            '<span style="color:#8DC647">CoinGecko</span>' : 
+            '<span style="color:#3861FB">CoinMarketCap</span>'}<br>`;
+          html += `<b>Last Updated:</b> ${new Date(data.market.last_updated).toLocaleString()}<br>`;
+          html += `</div>`;
+          
+          // Create a professional analysis box
+          html += `<div style="background-color:#f8f9fa; padding:15px; border-radius:5px; border-left:5px solid #4285f4;">`;
+          html += `<h3 style="margin-top:0;">AI Analysis</h3>`;
+          
+          // Display analysis text
+          if (data.analysis.text) {
+            html += `<p style="line-height:1.5;">${data.analysis.text}</p>`;
+          } else {
+            html += `<p>No analysis available</p>`;
+          }
+          
+          // Show analysis source information
+          if (data.analysis.source === 'gemini') {
+            html += `<p style="font-size:12px; color:#666; margin-top:10px; font-style:italic;">Analysis by Google Gemini AI based on real-time market data</p>`;
+          } else if (data.analysis.source === 'fallback') {
+            html += `<p style="font-size:12px; color:#ff6666; margin-top:10px; font-style:italic;">Basic fallback analysis (Gemini API unavailable) based on real-time data</p>`;
+          }
+          
+          html += `</div>`;
+          
+          document.getElementById('ethMarketAnalysis').innerHTML = html;
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+          document.getElementById('ethMarketAnalysis').innerHTML = `<span style="color:red">Error: ${error.message}</span>`;
+        });
+    }
+    
+    function geminiAnalyze() {
+      const prompt = document.getElementById('geminiPrompt').value;
+      fetch('http://localhost:3000/gemini-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      })
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('geminiResult').textContent = JSON.stringify(data.result, null, 2);
+          document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        });
+    }
+  </script>
+</body>
+</html>
